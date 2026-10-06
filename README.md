@@ -25,3 +25,7 @@ Outputs:
 Method: blob segmentation (bars and cubes for the scanner's own calibration are rejected by size),
 grid identification growing outwards from the dot nearest the scanner origin, rigid registration
 of the ideal grid to the dots within 60 mm of the isocentre, and least-squares polynomial fits.
+
+## Disclaimer
+
+Claude Code (Opus 5.5 Medium) was used to generate the code and most documentation.
