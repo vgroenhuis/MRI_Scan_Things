@@ -15,9 +15,11 @@ python calibration_cube.py "<folder with DICOM files>" --out docs
 
 Outputs:
 
-- `polynomials.json`: the `correction` polynomial maps distorted image coordinates (mm) to true
-  coordinates; `forward` maps true coordinates to distorted image coordinates.
+- `docs/polynomials.json`: the `correction` polynomial maps distorted image coordinates (mm) to true
+  coordinates; `forward` maps true coordinates to distorted image coordinates. Both are given in
+  DICOM patient coordinates (`lps`: +x left, +y posterior, +z superior) and in `ras`.
   Each coordinate is `sum_k c_k (x/s)^a_k (y/s)^b_k (z/s)^c_k` with `s = 100 mm`.
+  The web page has usage examples for Python, MATLAB, JavaScript and C.
 - `docs/`: data for the web page (GitHub Pages).
 
 Method: blob segmentation (bars and cubes for the scanner's own calibration are rejected by size),

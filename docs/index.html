@@ -24,6 +24,8 @@
   --s-seg: #e87ba4;
   --s-marker: #b9b7ad;
   --s-stray: #4a3aa7;
+  --s-room: #8f8d84;
+  --code-bg: #f3f2ee;
   --accent: #2a78d6;
 }
 @media (prefers-color-scheme: dark) {
@@ -32,7 +34,7 @@
     --page: #0d0d0d; --surface: #1a1a19; --text: #ffffff; --text-2: #c3c2b7;
     --muted: #898781; --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
     --s-measured: #3987e5; --s-forward: #d95926; --s-corrected: #199e70;
-    --s-ideal: #a3a199; --s-seg: #d55181; --s-marker: #5d5c57; --s-stray: #9085e9; --accent: #3987e5;
+    --s-ideal: #a3a199; --s-seg: #d55181; --s-marker: #5d5c57; --s-stray: #9085e9; --s-room: #7a786f; --code-bg: #232321; --accent: #3987e5;
   }
 }
 :root[data-theme="dark"] {
@@ -40,7 +42,7 @@
   --page: #0d0d0d; --surface: #1a1a19; --text: #ffffff; --text-2: #c3c2b7;
   --muted: #898781; --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
   --s-measured: #3987e5; --s-forward: #d95926; --s-corrected: #199e70;
-  --s-ideal: #a3a199; --s-seg: #d55181; --s-marker: #5d5c57; --s-stray: #9085e9; --accent: #3987e5;
+  --s-ideal: #a3a199; --s-seg: #d55181; --s-marker: #5d5c57; --s-stray: #9085e9; --s-room: #7a786f; --code-bg: #232321; --accent: #3987e5;
 }
 * { box-sizing: border-box; }
 body {
@@ -88,6 +90,20 @@ details { margin-top: 12px; }
 summary { cursor: pointer; color: var(--text-2); }
 pre { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 12px; }
 .hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
+.formula { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin: 12px 0; font-size: 17px; overflow-x: auto; }
+.formula .where { font-size: 14px; color: var(--text-2); margin-top: 6px; }
+ul { color: var(--text-2); max-width: 78ch; padding-left: 20px; }
+li { margin-bottom: 6px; }
+.tabs { display: flex; gap: 4px; margin-top: 12px; flex-wrap: wrap; }
+.tabs button[aria-selected="true"] { background: var(--surface); border-color: var(--axis); font-weight: 600; }
+pre.code { background: var(--code-bg); margin-top: 6px; line-height: 1.45; }
+.calc { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.calc label { display: grid; gap: 2px; font-size: 13px; color: var(--text-2); }
+.calc input, .calc select, .btns select { font: inherit; font-size: 14px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--page); color: var(--text); }
+.calc input { width: 96px; }
+.calc output { font-variant-numeric: tabular-nums; font-size: 14px; color: var(--text); }
+.calc .res { flex-basis: 100%; display: grid; gap: 2px; font-size: 14px; color: var(--text-2); }
+table.axes td, table.axes th { text-align: left; }
 footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
 </style>
 </head>
@@ -101,7 +117,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
   <div class="tiles" id="tiles"></div>
 
   <h2>3D viewer</h2>
-  <p>Drag to rotate, scroll to zoom, hover a dot for its details. All coordinates are scanner (patient) coordinates in mm. Distortion vectors and the deformed lattice can be exaggerated to make the pattern easier to see.</p>
+  <p>Drag to rotate, scroll to zoom, hover a dot for its details. Coordinates are DICOM patient coordinates (LPS) in mm, see <a href="#coordinates">coordinate system</a>. The letters L/R, A/P and S/I in the view mark the anatomical directions. Distortion vectors and the deformed lattice can be exaggerated to make the pattern easier to see.</p>
   <div class="viewer">
     <div class="panel" id="controls">
       <h3>Layers</h3>
@@ -114,6 +130,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
       <label class="layer"><input type="checkbox" data-layer="forward"><span class="sw" style="background:var(--s-forward)"></span>Dots predicted by polynomial fit</label>
       <label class="layer"><input type="checkbox" data-layer="corrected"><span class="sw" style="background:var(--s-corrected)"></span>Measured dots after correction</label>
       <label class="layer"><input type="checkbox" data-layer="vectors" checked><span class="sw line" style="background:linear-gradient(90deg,#f6c9c8,#8a1c1b)"></span>Distortion vectors (true → measured)</label>
+      <label class="layer"><input type="checkbox" data-layer="room"><span class="sw" style="background:var(--s-room)"></span>Scanner, bed &amp; floor (sketch)</label>
       <label class="layer"><input type="checkbox" data-layer="lattice"><span class="sw line" style="background:var(--s-forward)"></span>Deformed lattice (polynomial)</label>
 
       <h3>Slice position (mm)</h3>
@@ -133,9 +150,10 @@ footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
       <h3>View</h3>
       <div class="btns">
         <button data-view="iso">3D</button>
-        <button data-view="z">Axial (z)</button>
-        <button data-view="y">Coronal (y)</button>
-        <button data-view="x">Sagittal (x)</button>
+        <button data-view="room">Room</button>
+        <button data-view="z">Axial (from feet)</button>
+        <button data-view="y">Coronal (from front)</button>
+        <button data-view="x">Sagittal (from left)</button>
       </div>
       <div class="hint">The scan slices show the image as acquired, i.e. still distorted. Measured dots sit on the bright spots; the true grid is where they should have been.</div>
     </div>
@@ -150,14 +168,131 @@ footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
   <p>Statistics for all dots within a sphere of the given radius around the isocentre (true position).</p>
   <div class="tablewrap"><table id="radiusTable"></table></div>
 
+
+  <h2 id="coordinates">Coordinate system: XYZ, LPS and RAS</h2>
+  <p>All x, y, z values on this page and in the data files are <strong>DICOM patient coordinates</strong>, taken directly from the DICOM headers (<code>ImagePositionPatient</code>, <code>ImageOrientationPatient</code> = [1 0 0 0 1 0], <code>PixelSpacing</code>). DICOM defines this frame as <strong>LPS</strong>:</p>
+  <div class="tablewrap"><table class="axes">
+    <tr><th>Axis</th><th>LPS (DICOM, ITK, this page)</th><th>RAS (3D Slicer, NIfTI, FreeSurfer)</th><th>Voxel index → mm</th></tr>
+    <tr><td>x</td><td>+x towards patient <strong>L</strong>eft</td><td>x<sub>RAS</sub> = −x (towards <strong>R</strong>ight)</td><td>x = −135 + 1.0547 · column</td></tr>
+    <tr><td>y</td><td>+y towards <strong>P</strong>osterior</td><td>y<sub>RAS</sub> = −y (towards <strong>A</strong>nterior)</td><td>y = −135 + 1.0547 · row</td></tr>
+    <tr><td>z</td><td>+z towards <strong>S</strong>uperior (head)</td><td>z<sub>RAS</sub> = z (unchanged)</td><td>z = −85.98 + 1.055 · slice</td></tr>
+  </table></div>
+  <p style="margin-top:12px">Converting a point between LPS and RAS is just flipping the sign of x and y. The origin (0, 0, 0) is the same in both. Here it is the centre of the field of view, presumably the magnet isocentre.</p>
+  <p><strong>Relation to the room.</strong> The anatomical labels refer to the patient position entered at the console, here <strong>Feet First Supine (FFS)</strong>, also for a phantom. For a supine patient posterior is down, so <strong>+y points towards the floor</strong>. At 0° tilt the main field B<sub>0</sub> of the G-scan is vertical, i.e. along y. With feet first, +z (superior) points out of the magnet towards the free end of the bed. Had the scan been registered as Head First Supine, x and z would point the other way in the room. Switch on <em>Scanner, bed &amp; floor</em> in the viewer to see this.</p>
+  <p><strong>Converting the polynomial.</strong> The coefficients cannot simply be relabelled: in RAS the mapping becomes P<sub>RAS</sub>(r) = D · P<sub>LPS</sub>(D · r) with D = diag(−1, −1, 1), which changes the sign of some coefficients. Both versions are provided in <a href="polynomials.json">polynomials.json</a> (keys <code>lps</code> and <code>ras</code>).</p>
+
   <h2>Method</h2>
   <p><strong>Segmentation.</strong> The volume is smoothed slightly, a slowly varying background is subtracted, and the result is thresholded. Connected components of 4–200 voxels are dot candidates; the larger bars and cubes (placed in the phantom so the scanner can calibrate itself) are rejected. Each dot's centre is its intensity-weighted centroid.</p>
   <p><strong>Grid identification.</strong> The dot closest to the scanner origin gets grid index (0, 0, 0). From every identified dot, the six neighbours are predicted 20 mm away, extrapolating the local step from the opposite neighbour so the search follows the distortion. The nearest candidate within 6 mm is accepted. Dots are processed in order of increasing distance to the origin, so the grid grows outwards from the well-behaved centre.</p>
   <p><strong>True positions.</strong> The ideal 20 mm lattice is rigidly registered (rotation and translation) to the dots within 60 mm of the isocentre, where gradient non-linearity is negligible.</p>
   <p><strong>Polynomial fit.</strong> Two 5th order 3D polynomials (56 terms per coordinate) are fitted by least squares: a <em>correction</em> that maps distorted image coordinates to true coordinates, and a <em>forward</em> model that maps true coordinates to where they appear in the image. Coordinates are scaled by 100 mm for numerical conditioning.</p>
+
+  <h2 id="usage">Using the correction polynomial</h2>
+  <p>The <em>correction</em> polynomial maps a position as it appears in the image (distorted) to its true position. Each output coordinate is a separate polynomial in x, y and z:</p>
+  <div class="formula">
+    x′ = Σ<sub>k=1…56</sub> c<sub>k,x</sub> · (x/s)<sup>a<sub>k</sub></sup> · (y/s)<sup>b<sub>k</sub></sup> · (z/s)<sup>c<sub>k</sub></sup>
+    &nbsp;&nbsp;and likewise y′ (c<sub>k,y</sub>) and z′ (c<sub>k,z</sub>)
+    <div class="where">(x, y, z): distorted position in mm · (x′, y′, z′): true position in mm · s = 100 mm · the 56 exponent triples (a<sub>k</sub>, b<sub>k</sub>, c<sub>k</sub>) are all non-negative integers with a + b + c ≤ 5.</div>
+  </div>
+  <p>The <em>forward</em> polynomial has the same form and does the opposite: true position → position in the image. Exponents and coefficients for both, in LPS and RAS, are in <a href="polynomials.json" download>polynomials.json</a>.</p>
+  <ul>
+    <li><strong>Correcting points</strong> measured in an image (landmarks, a needle tip, a segmented surface): apply the <code>correction</code> polynomial to their coordinates.</li>
+    <li><strong>Undistorting a whole image</strong>: for every voxel of the corrected output, at true position p, sample the original image at <code>forward(p)</code> and interpolate (pull-back resampling). Using the forward polynomial avoids holes in the output.</li>
+    <li>The fit is <strong>only valid inside the volume covered by dots</strong>: roughly x −108…93, y −109…91, z −89…92 mm (LPS). Polynomials extrapolate badly outside it.</li>
+    <li>The polynomials apply to this scanner with this sequence and positioning (3D HYCE, 0° tilt, FFS). Another sequence or bandwidth may distort differently.</li>
+  </ul>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-code="py" aria-selected="true">Python</button>
+    <button role="tab" data-code="pyimg" aria-selected="false">Python: undistort volume</button>
+    <button role="tab" data-code="m" aria-selected="false">MATLAB</button>
+    <button role="tab" data-code="js" aria-selected="false">JavaScript</button>
+    <button role="tab" data-code="c" aria-selected="false">C / C++</button>
+  </div>
+<pre class="code" data-code="py">import json
+import numpy as np
+
+def load(path="polynomials.json", frame="lps", kind="correction"):
+    p = json.load(open(path))[frame][kind]          # frame: "lps" or "ras"
+    return np.array(p["exponents"]), np.array(p["coefficients_xyz"]), p["scale_mm"]
+
+def evaluate(poly, xyz):
+    """Map (N, 3) positions in mm to (N, 3) positions in mm."""
+    exponents, coef, s = poly
+    u = np.atleast_2d(np.asarray(xyz, float)) / s
+    out = np.zeros_like(u)
+    for (a, b, c), ck in zip(exponents, coef):
+        out += np.outer(u[:, 0]**a * u[:, 1]**b * u[:, 2]**c, ck)
+    return out
+
+correction = load(kind="correction")
+print(evaluate(correction, [[50.0, 30.0, -20.0]]))  # distorted -> true (LPS, mm)</pre>
+<pre class="code" data-code="pyimg" hidden>from scipy.ndimage import map_coordinates
+# load() and evaluate() as in the Python tab.
+# volume[z, y, x] as read from the DICOM series; (x0, y0, z0) = ImagePositionPatient
+# of the first slice; (dx, dy, dz) = voxel size in mm.
+# The output uses the same grid; enlarge it to keep parts that the correction moves
+# outside the original field of view.
+forward = load(kind="forward")
+zz, yy, xx = np.indices(volume.shape)
+true_xyz = np.stack([x0 + xx * dx, y0 + yy * dy, z0 + zz * dz], axis=-1).reshape(-1, 3)
+src = evaluate(forward, true_xyz)                   # where each true point appears in the scan
+coords = [(src[:, 2] - z0) / dz, (src[:, 1] - y0) / dy, (src[:, 0] - x0) / dx]
+corrected = map_coordinates(volume, coords, order=1, cval=0).reshape(volume.shape)</pre>
+<pre class="code" data-code="m" hidden>P = jsondecode(fileread('polynomials.json'));
+p = P.lps.correction;                 % or P.ras.correction, P.lps.forward, ...
+xyz = [50 30 -20];                    % N x 3 positions in mm
+u = xyz / p.scale_mm;
+out = zeros(size(xyz));
+for k = 1:size(p.exponents, 1)
+    e = p.exponents(k, :);
+    out = out + (u(:,1).^e(1) .* u(:,2).^e(2) .* u(:,3).^e(3)) * p.coefficients_xyz(k, :);
+end
+disp(out)                             % true position in mm</pre>
+<pre class="code" data-code="js" hidden>const P = await (await fetch('polynomials.json')).json();
+
+function evaluate(p, [x, y, z]) {
+  const s = p.scale_mm, u = [x / s, y / s, z / s], out = [0, 0, 0];
+  p.exponents.forEach(([a, b, c], k) =&gt; {
+    const t = u[0] ** a * u[1] ** b * u[2] ** c;
+    for (let i = 0; i &lt; 3; i++) out[i] += p.coefficients_xyz[k][i] * t;
+  });
+  return out;
+}
+
+console.log(evaluate(P.lps.correction, [50, 30, -20]));  // true position in mm</pre>
+<pre class="code" data-code="c" hidden>#include &lt;math.h&gt;
+
+/* E[k] = exponents, C[k] = coefficients_xyz (copy from polynomials.json), n = 56, s = 100.0 */
+void evaluate(const int E[][3], const double C[][3], int n, double s,
+              const double p[3], double out[3])
+{
+    double u[3] = {p[0] / s, p[1] / s, p[2] / s};
+    out[0] = out[1] = out[2] = 0.0;
+    for (int k = 0; k &lt; n; k++) {
+        double t = pow(u[0], E[k][0]) * pow(u[1], E[k][1]) * pow(u[2], E[k][2]);
+        for (int i = 0; i &lt; 3; i++) out[i] += C[k][i] * t;
+    }
+}</pre>
+
+  <h3 style="font-size:16px;margin:24px 0 8px">Try it</h3>
+  <div class="calc">
+    <label>Frame<select id="cframe"><option value="lps">LPS</option><option value="ras">RAS</option></select></label>
+    <label>x (mm)<input type="number" id="cx" value="50" step="1"></label>
+    <label>y (mm)<input type="number" id="cy" value="30" step="1"></label>
+    <label>z (mm)<input type="number" id="cz" value="-20" step="1"></label>
+    <div class="res">
+      <div>Correction (image → true): <output id="cout1"></output></div>
+      <div>Forward (true → image): <output id="cout2"></output></div>
+      <div class="hint" id="cwarn" style="margin:0"></div>
+    </div>
+  </div>
+
   <details>
-    <summary>Correction polynomial coefficients</summary>
-    <p class="hint">x<sub>true</sub> = Σ c<sub>k</sub> · (x/s)<sup>a</sup>(y/s)<sup>b</sup>(z/s)<sup>c</sup>, with s = 100 mm and (x, y, z) the distorted position in mm. Full data: <a href="data.json">data.json</a>.</p>
+    <summary>Coefficient tables</summary>
+    <div class="btns" style="margin:10px 0">
+      <select id="tframe" aria-label="Coordinate frame"><option value="lps">LPS</option><option value="ras">RAS</option></select>
+      <select id="tkind" aria-label="Polynomial"><option value="correction">Correction (image → true)</option><option value="forward">Forward (true → image)</option></select>
+    </div>
     <div class="tablewrap"><table id="coefTable"></table></div>
   </details>
 
@@ -169,7 +304,7 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 const fmt = (v, d = 1) => v.toFixed(d);
 const VECTOR_SCALE = [[0, '#f6c9c8'], [0.5, '#e34948'], [1, '#8a1c1b']];
 
-let D, vol, dims, origin, voxel, exag = 1;
+let D, POLY, vol, dims, origin, voxel, exag = 1;
 
 async function loadVolume(url) {
   const buf = await (await fetch(url)).arrayBuffer();
@@ -199,6 +334,41 @@ function radiusTable(s) {
   document.getElementById('radiusTable').innerHTML =
     '<tr><th>Radius (mm)</th><th>Dots</th><th>Max (mm)</th><th>Mean (mm)</th><th>RMS (mm)</th><th>95th pct (mm)</th><th>Max after correction (mm)</th></tr>' +
     rows.map(r => `<tr><td>${r.radius_mm}</td><td>${r.n}</td><td>${fmt(r.max, 2)}</td><td>${fmt(r.mean, 2)}</td><td>${fmt(r.rms, 2)}</td><td>${fmt(r.p95, 2)}</td><td>${fmt(r.corrected_max, 2)}</td></tr>`).join('');
+}
+
+function evalPoly(p, [x, y, z]) {
+  const s = p.scale_mm, u = [x / s, y / s, z / s], out = [0, 0, 0];
+  p.exponents.forEach(([a, b, c], k) => {
+    const t = u[0] ** a * u[1] ** b * u[2] ** c;
+    for (let i = 0; i < 3; i++) out[i] += p.coefficients_xyz[k][i] * t;
+  });
+  return out;
+}
+
+function setupUsage() {
+  document.querySelectorAll('[data-code]').forEach(el => {
+    if (el.tagName !== 'BUTTON') return;
+    el.addEventListener('click', () => {
+      document.querySelectorAll('button[data-code]').forEach(b => b.setAttribute('aria-selected', b === el));
+      document.querySelectorAll('pre[data-code]').forEach(p => { p.hidden = p.dataset.code !== el.dataset.code; });
+    });
+  });
+  const ids = ['cframe', 'cx', 'cy', 'cz'], v = id => document.getElementById(id);
+  const show = a => '(' + a.map(c => c.toFixed(2)).join(', ') + ') mm';
+  const calc = () => {
+    const f = v('cframe').value, p = [+v('cx').value, +v('cy').value, +v('cz').value];
+    const c = evalPoly(POLY[f].correction, p), w = evalPoly(POLY[f].forward, p);
+    v('cout1').textContent = `${show(c)}, shift ${norm(sub(c, p)).toFixed(2)} mm`;
+    v('cout2').textContent = `${show(w)}, shift ${norm(sub(w, p)).toFixed(2)} mm`;
+    const lps = f === 'ras' ? [-p[0], -p[1], p[2]] : p;
+    const r = POLY.valid_region_mm, inside = lps.every((q, i) => q >= r.min[i] - 10 && q <= r.max[i] + 10);
+    v('cwarn').textContent = inside ? '' : 'Outside the region covered by dots: the result is an extrapolation and unreliable.';
+  };
+  ids.forEach(id => v(id).addEventListener('input', calc));
+  calc();
+  const table = () => coefTable(POLY[v('tframe').value][v('tkind').value]);
+  ['tframe', 'tkind'].forEach(id => v(id).addEventListener('change', table));
+  table();
 }
 
 function coefTable(p) {
@@ -277,6 +447,49 @@ function latticeTrace() {
     line: {width: 2, color: css('--s-forward')}, opacity: 0.6};
 }
 
+// ------------------------------------------------- scanner sketch (room) --
+// Approximate geometry of the Esaote G-scan Brio at 0° tilt, in LPS mm (+y = down for a
+// supine patient). C-shaped permanent magnet with poles above and below the patient
+// (vertical B0) and a ~33 cm gap; feet first, so the bed extends towards +z.
+// Dimensions are a sketch, not taken from a technical drawing.
+const ROOM = {gap: 330, poleDepth: 330, magnetX: [-650, 330], magnetZ: [-330, 330], yokeX: [-650, -430],
+  floorY: 1000, bedHalfWidth: 240, bedThickness: 35, bedZ: [-500, 2100], bedBaseZ: [1450, 1850]};
+
+function box([x0, x1], [y0, y1], [z0, z1], name, color, opacity) {
+  return {type: 'mesh3d', name, hoverinfo: 'name', color, opacity, flatshading: true,
+    x: [x0, x1, x1, x0, x0, x1, x1, x0], y: [y0, y0, y1, y1, y0, y0, y1, y1], z: [z0, z0, z0, z0, z1, z1, z1, z1],
+    i: [0, 0, 4, 4, 0, 0, 3, 3, 0, 0, 1, 1], j: [1, 2, 5, 6, 1, 5, 2, 6, 3, 7, 2, 6], k: [2, 3, 6, 7, 5, 4, 6, 7, 7, 4, 6, 5],
+    lighting: {ambient: 0.75, diffuse: 0.5, specular: 0}};
+}
+
+function wire([x0, x1], [y0, y1], [z0, z1], name, color) {
+  const P = [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]];
+  const E = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
+  const x = [], y = [], z = [];
+  E.forEach(([a, b]) => { x.push(P[a][0], P[b][0], null); y.push(P[a][1], P[b][1], null); z.push(P[a][2], P[b][2], null); });
+  return {type: 'scatter3d', mode: 'lines', name, hoverinfo: 'name', x, y, z, line: {width: 3, color}};
+}
+
+function roomTraces() {
+  const R = ROOM, c = css('--s-room'), g = R.gap / 2, top = -g - R.poleDepth, bot = g + R.poleDepth;
+  const ext = a => [Math.min(...D.dots.true.map(p => p[a])) - 12, Math.max(...D.dots.true.map(p => p[a])) + 12];
+  const phantom = [ext(0), ext(1), ext(2)];
+  const bedTop = phantom[1][1] + 2, bedBottom = bedTop + R.bedThickness;
+  return [
+    box(R.magnetX, [top, -g], R.magnetZ, 'Magnet: upper pole', c, 0.35),
+    box(R.magnetX, [g, bot], R.magnetZ, 'Magnet: lower pole', c, 0.35),
+    box(R.yokeX, [-g, g], R.magnetZ, 'Magnet: yoke (C)', c, 0.35),
+    box(R.magnetX, [bot, R.floorY], [R.magnetZ[0] + 40, R.magnetZ[1] - 40], 'Magnet base', c, 0.25),
+    box([-R.bedHalfWidth, R.bedHalfWidth], [bedTop, bedBottom], R.bedZ, 'Patient bed', css('--s-forward'), 0.3),
+    box([-R.bedHalfWidth + 60, R.bedHalfWidth - 60], [bedBottom, R.floorY], R.bedBaseZ, 'Bed support', c, 0.25),
+    box([-1500, 1500], [R.floorY, R.floorY + 5], [-1500, 2600], 'Floor', c, 0.15),
+    wire(...phantom, 'Calibration cube (approx.)', css('--text-2')),
+    {type: 'scatter3d', mode: 'lines+text', name: 'B0 (vertical)', hoverinfo: 'name', x: [250, 250], y: [-g + 20, g - 20], z: [0, 0],
+      text: ['B₀', ''], textposition: 'middle right', textfont: {color: css('--text-2'), size: 14},
+      line: {width: 3, color: css('--text-2'), dash: 'dash'}},
+  ];
+}
+
 let traceIndex = {};
 function buildTraces() {
   const n = D.dots.measured.length;
@@ -309,12 +522,22 @@ function buildTraces() {
     hovertemplate: dotHover('After correction'), marker: {size: 3.5, color: css('--s-corrected')}}));
   const v = vectorTrace(); v.visible = S('vectors'); add('vectors', v);
   const l = latticeTrace(); l.visible = S('lattice'); add('lattice', l);
+  roomTraces().forEach(t => { t.visible = S('room'); add('room', t); });
   return tr;
 }
 
+function orientationLabels() {
+  const L = 150, lab = (x, y, z, text) => ({x, y, z, text, showarrow: false,
+    font: {size: 14, color: css('--text-2')}, bgcolor: css('--surface'), opacity: 0.85});
+  return [lab(L, 0, 0, 'L'), lab(-L, 0, 0, 'R'), lab(0, L, 0, 'P'), lab(0, -L, 0, 'A'),
+    lab(0, 0, 115, 'S'), lab(0, 0, -115, 'I')];
+}
+
+// Radiological conventions: axial seen from the feet, coronal from the front, sagittal from the left.
 const CAMERAS = {
   iso: {eye: {x: 1.5, y: -1.5, z: 1.0}, up: {x: 0, y: 0, z: 1}, projection: {type: 'perspective'}},
-  z: {eye: {x: 0, y: 0, z: 2.3}, up: {x: 0, y: -1, z: 0}, projection: {type: 'orthographic'}},
+  room: {eye: {x: 1.0, y: -0.55, z: 0.8}, up: {x: 0, y: -1, z: 0}, projection: {type: 'perspective'}},
+  z: {eye: {x: 0, y: 0, z: -2.3}, up: {x: 0, y: -1, z: 0}, projection: {type: 'orthographic'}},
   y: {eye: {x: 0, y: -2.3, z: 0}, up: {x: 0, y: 0, z: 1}, projection: {type: 'orthographic'}},
   x: {eye: {x: 2.3, y: 0, z: 0}, up: {x: 0, y: 0, z: 1}, projection: {type: 'orthographic'}},
 };
@@ -325,7 +548,8 @@ function layout3d() {
   return {paper_bgcolor: css('--surface'), font: {family: 'system-ui, sans-serif', color: css('--text')},
     margin: {l: 0, r: 0, t: 0, b: 0}, showlegend: false, uirevision: 'keep',
     hoverlabel: {bgcolor: css('--surface'), bordercolor: css('--border'), font: {color: css('--text')}},
-    scene: {aspectmode: 'data', xaxis: ax('x (mm)'), yaxis: ax('y (mm)'), zaxis: ax('z (mm)'), camera: CAMERAS.iso}};
+    scene: {aspectmode: 'data', xaxis: ax('x → L (mm)'), yaxis: ax('y → P (mm)'), zaxis: ax('z → S (mm)'),
+      camera: CAMERAS.iso, annotations: orientationLabels()}};
 }
 
 function render3d() {
@@ -391,6 +615,7 @@ function setupControls() {
   document.querySelectorAll('[data-layer]').forEach(cb => cb.addEventListener('change', () => {
     if (cb.dataset.layer === 'slices') return sliceVis();
     Plotly.restyle('plot3d', {visible: cb.checked}, traceIndex[cb.dataset.layer]);
+    if (cb.dataset.layer === 'room') Plotly.relayout('plot3d', {'scene.camera': CAMERAS[cb.checked ? 'room' : 'iso']});
   }));
   ['showX', 'showY', 'showZ'].forEach(id => document.getElementById(id).addEventListener('change', sliceVis));
   document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () =>
@@ -401,7 +626,8 @@ function setupControls() {
 (async () => {
   try {
     D = await (await fetch('data.json')).json();
-    tiles(D.stats); radiusTable(D.stats); coefTable(D.correction_polynomial); radiusPlot();
+    POLY = await (await fetch('polynomials.json')).json();
+    tiles(D.stats); radiusTable(D.stats); setupUsage(); radiusPlot();
     dims = D.volume.shape_zyx; origin = D.volume.origin_xyz; voxel = D.volume.voxel_xyz;
     vol = await loadVolume(D.volume.file);
     document.getElementById('plot3d').innerHTML = '';

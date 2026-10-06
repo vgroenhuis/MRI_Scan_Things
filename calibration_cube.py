@@ -154,6 +154,16 @@ class Polynomial3D:
         p.coef = coef
         return p
 
+    def to_ras(self):
+        """Same mapping expressed in RAS instead of LPS coordinates.
+
+        RAS = D @ LPS with D = diag(-1, -1, 1), so P_ras(r) = D P_lps(D r):
+        each coefficient gains a factor d_i * (-1)^(a + b).
+        """
+        d = np.array([-1.0, -1.0, 1.0])
+        sign = (-1.0) ** (self.exponents[:, 0] + self.exponents[:, 1])
+        return Polynomial3D(self.exponents, self.coef * sign[:, None] * d[None, :], self.scale)
+
     def to_dict(self):
         return {"order": int(self.exponents.sum(1).max()),
                 "scale_mm": self.scale,
@@ -271,6 +281,23 @@ def export_web(res, stats, outdir):
         json.dump(data, f, separators=(",", ":"))
 
 
+def export_polynomials(res, path):
+    """Write correction and forward polynomials in both LPS and RAS coordinates."""
+    out = {"description": "correction maps distorted (image) positions to true positions; "
+                          "forward maps true positions to distorted (image) positions. "
+                          "Positions in mm. Each output coordinate is "
+                          "sum_k c_k * (x/s)^a_k * (y/s)^b_k * (z/s)^c_k with s = scale_mm. "
+                          "lps: DICOM patient coordinates (+x left, +y posterior, +z superior); "
+                          "ras: +x right, +y anterior, +z superior.",
+           "valid_region_mm": {"min": res["true"].min(0).round(1).tolist(),
+                               "max": res["true"].max(0).round(1).tolist()}}
+    for frame, conv in (("lps", lambda p: p), ("ras", Polynomial3D.to_ras)):
+        out[frame] = {"correction": conv(res["correction"]).to_dict(),
+                      "forward": conv(res["forward"]).to_dict()}
+    with open(path, "w") as f:
+        json.dump(out, f, indent=1)
+
+
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -282,11 +309,5 @@ if __name__ == "__main__":
     print(json.dumps({k: v for k, v in stats.items() if k != "per_radius"}, indent=1))
     for row in stats["per_radius"]:
         print(row)
-    with open("polynomials.json", "w") as f:
-        json.dump({"correction": res["correction"].to_dict(),
-                   "forward": res["forward"].to_dict(),
-                   "description": "correction maps distorted (image) xyz mm to true xyz mm; "
-                                  "forward maps true xyz mm to distorted xyz mm. "
-                                  "Evaluate sum_k c_k * (x/s)^a_k (y/s)^b_k (z/s)^c_k, s = scale_mm."},
-                  f, indent=1)
+    export_polynomials(res, os.path.join(args.out, "polynomials.json"))
     export_web(res, stats, args.out)
