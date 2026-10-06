@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MRI Distortion Calibration</title>
+<meta name="description" content="Geometric distortion of an Esaote G-scan Brio 0.25 T MRI scanner measured with a 20 mm calibration grid phantom, with a 5th order polynomial correction.">
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --s-measured: #2a78d6;
+  --s-forward: #eb6834;
+  --s-corrected: #1baf7a;
+  --s-ideal: #898781;
+  --s-seg: #e87ba4;
+  --s-marker: #b9b7ad;
+  --s-stray: #4a3aa7;
+  --accent: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --text: #ffffff; --text-2: #c3c2b7;
+    --muted: #898781; --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --s-measured: #3987e5; --s-forward: #d95926; --s-corrected: #199e70;
+    --s-ideal: #a3a199; --s-seg: #d55181; --s-marker: #5d5c57; --s-stray: #9085e9; --accent: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --text: #ffffff; --text-2: #c3c2b7;
+  --muted: #898781; --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --s-measured: #3987e5; --s-forward: #d95926; --s-corrected: #199e70;
+  --s-ideal: #a3a199; --s-seg: #d55181; --s-marker: #5d5c57; --s-stray: #9085e9; --accent: #3987e5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 1280px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; margin: 40px 0 12px; }
+p { margin: 0 0 12px; color: var(--text-2); max-width: 78ch; }
+a { color: var(--accent); }
+code { font-size: 13px; }
+.sub { color: var(--text-2); margin-bottom: 24px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 20px 0 8px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.tile .label { font-size: 13px; color: var(--text-2); }
+.tile .value { font-size: 26px; font-weight: 600; margin-top: 2px; }
+.tile .value small { font-size: 14px; font-weight: 400; color: var(--text-2); margin-left: 3px; }
+.tile .note { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.viewer { display: grid; grid-template-columns: 290px 1fr; gap: 12px; }
+@media (max-width: 860px) { .viewer { grid-template-columns: 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.panel h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 14px 0 6px; font-weight: 600; }
+.panel h3:first-child { margin-top: 0; }
+.layer { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; font-size: 14px; }
+.layer input { margin: 0; accent-color: var(--accent); }
+.sw { width: 12px; height: 12px; border-radius: 50%; flex: none; border: 1px solid var(--border); }
+.sw.line { height: 3px; border-radius: 2px; border: 0; }
+.range { display: grid; grid-template-columns: 22px 1fr 64px; align-items: center; gap: 6px; font-size: 13px; color: var(--text-2); }
+.range input { width: 100%; accent-color: var(--accent); }
+.range output { text-align: right; font-variant-numeric: tabular-nums; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+button { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--page); color: var(--text); cursor: pointer; }
+button:hover { border-color: var(--axis); }
+#plot3d { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; height: 760px; min-width: 0; }
+@media (max-width: 860px) { #plot3d { height: 520px; } }
+#plotRadius { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; height: 420px; }
+.loading { display: grid; place-items: center; height: 100%; color: var(--muted); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grid); }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--text-2); font-weight: 600; }
+.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 6px 8px; }
+details { margin-top: 12px; }
+summary { cursor: pointer; color: var(--text-2); }
+pre { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 12px; }
+.hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
+footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>MRI geometric distortion: calibration cube</h1>
+  <p class="sub">Esaote G-scan Brio (0.25 T), 3D HYCE sequence, 256 × 256 × 164 voxels of 1.055 mm. Scanned at the University of Twente, May 2022.
+  The phantom contains small markers on a regular 3D grid with <strong>20 mm</strong> spacing. Comparing where the scanner shows them with where they really are gives the geometric distortion, which is modelled by a 5th order polynomial.</p>
+  <p>Why a custom method? The scanner's own software can correct geometric distortion in 2D (within each slice), but not in 3D. For 3D acquisitions the through-plane component and its variation across slices stay uncorrected. A custom measurement and correction method was therefore needed to compensate for the distortion in all three dimensions.</p>
+
+  <div class="tiles" id="tiles"></div>
+
+  <h2>3D viewer</h2>
+  <p>Drag to rotate, scroll to zoom, hover a dot for its details. All coordinates are scanner (patient) coordinates in mm. Distortion vectors and the deformed lattice can be exaggerated to make the pattern easier to see.</p>
+  <div class="viewer">
+    <div class="panel" id="controls">
+      <h3>Layers</h3>
+      <label class="layer"><input type="checkbox" data-layer="slices" checked><span class="sw" style="background:linear-gradient(90deg,#000,#fff)"></span>Original scan (slices)</label>
+      <label class="layer"><input type="checkbox" data-layer="seg"><span class="sw" style="background:var(--s-seg)"></span>Segmentation (dot voxels)</label>
+      <label class="layer"><input type="checkbox" data-layer="markers"><span class="sw" style="background:var(--s-marker)"></span>Scanner calibration bars (excluded)</label>
+      <label class="layer"><input type="checkbox" data-layer="stray" checked><span class="sw" style="background:var(--s-stray)"></span>Unassigned blobs (stray)</label>
+      <label class="layer"><input type="checkbox" data-layer="measured" checked><span class="sw" style="background:var(--s-measured)"></span>Measured dot centres</label>
+      <label class="layer"><input type="checkbox" data-layer="ideal"><span class="sw" style="background:var(--s-ideal)"></span>True grid (rigidly registered)</label>
+      <label class="layer"><input type="checkbox" data-layer="forward"><span class="sw" style="background:var(--s-forward)"></span>Dots predicted by polynomial fit</label>
+      <label class="layer"><input type="checkbox" data-layer="corrected"><span class="sw" style="background:var(--s-corrected)"></span>Measured dots after correction</label>
+      <label class="layer"><input type="checkbox" data-layer="vectors" checked><span class="sw line" style="background:linear-gradient(90deg,#f6c9c8,#8a1c1b)"></span>Distortion vectors (true → measured)</label>
+      <label class="layer"><input type="checkbox" data-layer="lattice"><span class="sw line" style="background:var(--s-forward)"></span>Deformed lattice (polynomial)</label>
+
+      <h3>Slice position (mm)</h3>
+      <div class="range"><span>x</span><input type="range" id="sx"><output id="ox"></output></div>
+      <div class="range"><span>y</span><input type="range" id="sy"><output id="oy"></output></div>
+      <div class="range"><span>z</span><input type="range" id="sz"><output id="oz"></output></div>
+      <div class="btns" style="margin-top:6px">
+        <label class="layer"><input type="checkbox" id="showX" checked>x</label>
+        <label class="layer"><input type="checkbox" id="showY">y</label>
+        <label class="layer"><input type="checkbox" id="showZ" checked>z</label>
+      </div>
+      <div class="range"><span>◐</span><input type="range" id="sop" min="0.2" max="1" step="0.05" value="0.85"><output id="oop"></output></div>
+
+      <h3>Exaggeration</h3>
+      <div class="range"><span>×</span><input type="range" id="sexag" min="1" max="5" step="0.5" value="1"><output id="oexag"></output></div>
+
+      <h3>View</h3>
+      <div class="btns">
+        <button data-view="iso">3D</button>
+        <button data-view="z">Axial (z)</button>
+        <button data-view="y">Coronal (y)</button>
+        <button data-view="x">Sagittal (x)</button>
+      </div>
+      <div class="hint">The scan slices show the image as acquired, i.e. still distorted. Measured dots sit on the bright spots; the true grid is where they should have been.</div>
+    </div>
+    <div id="plot3d"><div class="loading">Loading scan and results…</div></div>
+  </div>
+
+  <h2>Distortion versus distance from isocentre</h2>
+  <p>Each dot's displacement from its true position, before and after applying the polynomial correction. Distortion grows quickly towards the edge of the field of view.</p>
+  <div id="plotRadius"></div>
+
+  <h2>Statistics per spherical volume</h2>
+  <p>Statistics for all dots within a sphere of the given radius around the isocentre (true position).</p>
+  <div class="tablewrap"><table id="radiusTable"></table></div>
+
+  <h2>Method</h2>
+  <p><strong>Segmentation.</strong> The volume is smoothed slightly, a slowly varying background is subtracted, and the result is thresholded. Connected components of 4–200 voxels are dot candidates; the larger bars and cubes (placed in the phantom so the scanner can calibrate itself) are rejected. Each dot's centre is its intensity-weighted centroid.</p>
+  <p><strong>Grid identification.</strong> The dot closest to the scanner origin gets grid index (0, 0, 0). From every identified dot, the six neighbours are predicted 20 mm away, extrapolating the local step from the opposite neighbour so the search follows the distortion. The nearest candidate within 6 mm is accepted. Dots are processed in order of increasing distance to the origin, so the grid grows outwards from the well-behaved centre.</p>
+  <p><strong>True positions.</strong> The ideal 20 mm lattice is rigidly registered (rotation and translation) to the dots within 60 mm of the isocentre, where gradient non-linearity is negligible.</p>
+  <p><strong>Polynomial fit.</strong> Two 5th order 3D polynomials (56 terms per coordinate) are fitted by least squares: a <em>correction</em> that maps distorted image coordinates to true coordinates, and a <em>forward</em> model that maps true coordinates to where they appear in the image. Coordinates are scaled by 100 mm for numerical conditioning.</p>
+  <details>
+    <summary>Correction polynomial coefficients</summary>
+    <p class="hint">x<sub>true</sub> = Σ c<sub>k</sub> · (x/s)<sup>a</sup>(y/s)<sup>b</sup>(z/s)<sup>c</sup>, with s = 100 mm and (x, y, z) the distorted position in mm. Full data: <a href="data.json">data.json</a>.</p>
+    <div class="tablewrap"><table id="coefTable"></table></div>
+  </details>
+
+  <footer>Source code: <a href="https://github.com/vgroenhuis/MRI_Scan_Things">github.com/vgroenhuis/MRI_Scan_Things</a> (<code>calibration_cube.py</code>).</footer>
+</main>
+
+<script>
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = (v, d = 1) => v.toFixed(d);
+const VECTOR_SCALE = [[0, '#f6c9c8'], [0.5, '#e34948'], [1, '#8a1c1b']];
+
+let D, vol, dims, origin, voxel, exag = 1;
+
+async function loadVolume(url) {
+  const buf = await (await fetch(url)).arrayBuffer();
+  const head = new Uint8Array(buf, 0, 2);
+  if (head[0] === 0x1f && head[1] === 0x8b) {
+    const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+  return new Uint8Array(buf);  // already decoded by the server
+}
+
+function tiles(s) {
+  const r100 = s.per_radius.find(r => r.radius_mm === 100);
+  const items = [
+    ['Dots identified', s.n_dots, '', `of ${s.n_candidates} detected blobs`],
+    ['Maximum distortion', fmt(s.distortion.max), 'mm', 'whole field of view'],
+    ['RMS distortion', fmt(s.distortion.rms), 'mm', `mean ${fmt(s.distortion.mean)} mm`],
+    ['Max within 100 mm', fmt(r100.max), 'mm', `${r100.n} dots, 200 mm DSV`],
+    ['Residual after correction', fmt(s.correction_residual.rms, 2), 'mm RMS', `max ${fmt(s.correction_residual.max)} mm`],
+  ];
+  document.getElementById('tiles').innerHTML = items.map(([l, v, u, n]) =>
+    `<div class="tile"><div class="label">${l}</div><div class="value">${v}<small>${u}</small></div><div class="note">${n}</div></div>`).join('');
+}
+
+function radiusTable(s) {
+  const rows = s.per_radius.filter((r, i, a) => i === 0 || r.n !== a[i - 1].n);
+  document.getElementById('radiusTable').innerHTML =
+    '<tr><th>Radius (mm)</th><th>Dots</th><th>Max (mm)</th><th>Mean (mm)</th><th>RMS (mm)</th><th>95th pct (mm)</th><th>Max after correction (mm)</th></tr>' +
+    rows.map(r => `<tr><td>${r.radius_mm}</td><td>${r.n}</td><td>${fmt(r.max, 2)}</td><td>${fmt(r.mean, 2)}</td><td>${fmt(r.rms, 2)}</td><td>${fmt(r.p95, 2)}</td><td>${fmt(r.corrected_max, 2)}</td></tr>`).join('');
+}
+
+function coefTable(p) {
+  const nm = ([a, b, c]) => [['x', a], ['y', b], ['z', c]].filter(([, e]) => e).map(([v, e]) => e > 1 ? `${v}<sup>${e}</sup>` : v).join('·') || '1';
+  document.getElementById('coefTable').innerHTML =
+    '<tr><th>Term</th><th>c<sub>x</sub></th><th>c<sub>y</sub></th><th>c<sub>z</sub></th></tr>' +
+    p.exponents.map((e, i) => `<tr><td>${nm(e)}</td>${p.coefficients_xyz[i].map(c => `<td>${c.toExponential(4)}</td>`).join('')}</tr>`).join('');
+}
+
+const sub = (a, b) => a.map((v, i) => v - b[i]);
+const norm = v => Math.hypot(...v);
+
+// ---------------------------------------------------------------- slices --
+function sliceTrace(axis, mm) {
+  const [nz, ny, nx] = dims;
+  const xs = Array.from({length: nx}, (_, i) => origin[0] + i * voxel[0]);
+  const ys = Array.from({length: ny}, (_, i) => origin[1] + i * voxel[1]);
+  const zs = Array.from({length: nz}, (_, i) => origin[2] + i * voxel[2]);
+  let x, y, z, c;
+  if (axis === 'z') {
+    const k = Math.round((mm - origin[2]) / voxel[2]);
+    c = Array.from({length: ny}, (_, j) => Array.from(vol.subarray(k * ny * nx + j * nx, k * ny * nx + (j + 1) * nx)));
+    x = ys.map(() => xs); y = ys.map(yy => xs.map(() => yy)); z = ys.map(() => xs.map(() => zs[k]));
+  } else if (axis === 'y') {
+    const j = Math.round((mm - origin[1]) / voxel[1]);
+    c = Array.from({length: nz}, (_, k) => Array.from(vol.subarray(k * ny * nx + j * nx, k * ny * nx + (j + 1) * nx)));
+    x = zs.map(() => xs); z = zs.map(zz => xs.map(() => zz)); y = zs.map(() => xs.map(() => ys[j]));
+  } else {
+    const i = Math.round((mm - origin[0]) / voxel[0]);
+    c = Array.from({length: nz}, (_, k) => ys.map((_, j) => vol[k * ny * nx + j * nx + i]));
+    y = zs.map(() => ys); z = zs.map(zz => ys.map(() => zz)); x = zs.map(() => ys.map(() => xs[i]));
+  }
+  return {type: 'surface', x, y, z, surfacecolor: c, cmin: 0, cmax: 200,
+    colorscale: [[0, '#000000'], [1, '#ffffff']], showscale: false, hoverinfo: 'skip',
+    opacity: +document.getElementById('sop').value, name: `scan ${axis}`,
+    lighting: {ambient: 1, diffuse: 0, specular: 0, roughness: 1, fresnel: 0}};
+}
+
+// ------------------------------------------------------------- 3D traces --
+const pts = (arr, extra) => ({type: 'scatter3d', mode: 'markers',
+  x: arr.map(p => p[0]), y: arr.map(p => p[1]), z: arr.map(p => p[2]), ...extra});
+
+function dotHover(name) {
+  return `<b>${name}</b><br>grid (%{customdata[0]}, %{customdata[1]}, %{customdata[2]})<br>` +
+    'x %{x:.1f}  y %{y:.1f}  z %{z:.1f} mm<br>distortion %{customdata[3]:.2f} mm<br>fit residual %{customdata[4]:.2f} mm<extra></extra>';
+}
+
+function vectorTrace() {
+  const x = [], y = [], z = [], c = [];
+  D.dots.true.forEach((t, i) => {
+    const m = D.dots.measured[i], d = sub(m, t), len = norm(d);
+    const e = t.map((v, k) => v + exag * d[k]);
+    x.push(t[0], e[0], null); y.push(t[1], e[1], null); z.push(t[2], e[2], null); c.push(len, len, len);
+  });
+  return {type: 'scatter3d', mode: 'lines', x, y, z, name: 'distortion vectors', hoverinfo: 'skip',
+    line: {width: 4, color: c, colorscale: VECTOR_SCALE, cmin: 0, cmax: Math.ceil(D.stats.distortion.max),
+      colorbar: {title: {text: 'mm', side: 'top'}, len: 0.45, thickness: 12, x: 1, y: 0.25, outlinewidth: 0,
+        tickfont: {color: css('--text-2')}, titlefont: {color: css('--text-2')}}}};
+}
+
+function latticeTrace() {
+  const [nx, ny, nz] = D.field.shape, T = D.field.true, M = D.field.measured;
+  const at = (i, j, k) => (i * ny + j) * nz + k;
+  const x = [], y = [], z = [];
+  const push = idx => {
+    const m = M[idx], t = T[idx];
+    if (!m) { x.push(null); y.push(null); z.push(null); return; }
+    const p = t.map((v, a) => v + exag * (m[a] - v));
+    x.push(p[0]); y.push(p[1]); z.push(p[2]);
+  };
+  const brk = () => { x.push(null); y.push(null); z.push(null); };
+  for (let j = 0; j < ny; j += 2) for (let k = 0; k < nz; k += 2) { for (let i = 0; i < nx; i++) push(at(i, j, k)); brk(); }
+  for (let i = 0; i < nx; i += 2) for (let k = 0; k < nz; k += 2) { for (let j = 0; j < ny; j++) push(at(i, j, k)); brk(); }
+  for (let i = 0; i < nx; i += 2) for (let j = 0; j < ny; j += 2) { for (let k = 0; k < nz; k++) push(at(i, j, k)); brk(); }
+  return {type: 'scatter3d', mode: 'lines', x, y, z, name: 'deformed lattice', hoverinfo: 'skip', connectgaps: false,
+    line: {width: 2, color: css('--s-forward')}, opacity: 0.6};
+}
+
+let traceIndex = {};
+function buildTraces() {
+  const n = D.dots.measured.length;
+  const dist = D.dots.measured.map((m, i) => norm(sub(m, D.dots.true[i])));
+  const corrRes = D.dots.corrected.map((c, i) => norm(sub(c, D.dots.true[i])));
+  const fwdRes = D.dots.forward.map((f, i) => norm(sub(f, D.dots.measured[i])));
+  const cd = res => D.dots.grid_index.map((g, i) => [...g, dist[i], res[i]]);
+  const S = id => document.querySelector(`[data-layer="${id}"]`).checked;
+  const tr = [];
+  const add = (key, t) => { traceIndex[key] = (traceIndex[key] || []).concat(tr.length); tr.push(t); };
+
+  for (const ax of ['x', 'y', 'z']) {
+    const t = sliceTrace(ax, +document.getElementById('s' + ax).value);
+    t.visible = S('slices') && document.getElementById('show' + ax.toUpperCase()).checked;
+    add('slice_' + ax, t);
+  }
+  add('seg', pts(D.segmentation, {name: 'segmentation', hoverinfo: 'skip', visible: S('seg'),
+    marker: {size: 2, color: css('--s-seg'), opacity: 0.6}}));
+  add('markers', pts(D.rejected, {name: 'calibration bars', hoverinfo: 'skip', visible: S('markers'),
+    marker: {size: 2, color: css('--s-marker'), opacity: 0.35}}));
+  add('stray', pts(D.stray, {name: 'stray', visible: S('stray'), hovertemplate: '<b>Unassigned blob</b><br>x %{x:.1f}  y %{y:.1f}  z %{z:.1f} mm<extra></extra>',
+    marker: {size: 6, color: css('--s-stray'), symbol: 'x'}}));
+  add('ideal', pts(D.dots.true, {name: 'true grid', visible: S('ideal'), customdata: cd(corrRes),
+    hovertemplate: dotHover('True position'), marker: {size: 3, color: css('--s-ideal'), symbol: 'diamond'}}));
+  add('measured', pts(D.dots.measured, {name: 'measured', visible: S('measured'), customdata: cd(fwdRes),
+    hovertemplate: dotHover('Measured dot'), marker: {size: 3.5, color: css('--s-measured')}}));
+  add('forward', pts(D.dots.forward, {name: 'polynomial prediction', visible: S('forward'), customdata: cd(fwdRes),
+    hovertemplate: dotHover('Predicted by fit'), marker: {size: 3.5, color: css('--s-forward'), symbol: 'square'}}));
+  add('corrected', pts(D.dots.corrected, {name: 'corrected', visible: S('corrected'), customdata: cd(corrRes),
+    hovertemplate: dotHover('After correction'), marker: {size: 3.5, color: css('--s-corrected')}}));
+  const v = vectorTrace(); v.visible = S('vectors'); add('vectors', v);
+  const l = latticeTrace(); l.visible = S('lattice'); add('lattice', l);
+  return tr;
+}
+
+const CAMERAS = {
+  iso: {eye: {x: 1.5, y: -1.5, z: 1.0}, up: {x: 0, y: 0, z: 1}, projection: {type: 'perspective'}},
+  z: {eye: {x: 0, y: 0, z: 2.3}, up: {x: 0, y: -1, z: 0}, projection: {type: 'orthographic'}},
+  y: {eye: {x: 0, y: -2.3, z: 0}, up: {x: 0, y: 0, z: 1}, projection: {type: 'orthographic'}},
+  x: {eye: {x: 2.3, y: 0, z: 0}, up: {x: 0, y: 0, z: 1}, projection: {type: 'orthographic'}},
+};
+
+function layout3d() {
+  const ax = t => ({title: {text: t}, color: css('--text-2'), gridcolor: css('--grid'), zerolinecolor: css('--axis'),
+    backgroundcolor: css('--surface'), showbackground: true, showspikes: false});
+  return {paper_bgcolor: css('--surface'), font: {family: 'system-ui, sans-serif', color: css('--text')},
+    margin: {l: 0, r: 0, t: 0, b: 0}, showlegend: false, uirevision: 'keep',
+    hoverlabel: {bgcolor: css('--surface'), bordercolor: css('--border'), font: {color: css('--text')}},
+    scene: {aspectmode: 'data', xaxis: ax('x (mm)'), yaxis: ax('y (mm)'), zaxis: ax('z (mm)'), camera: CAMERAS.iso}};
+}
+
+function render3d() {
+  traceIndex = {};
+  const el = document.getElementById('plot3d');
+  const cam = el._fullLayout && el._fullLayout.scene && el._fullLayout.scene.camera;
+  const lay = layout3d();
+  if (cam) lay.scene.camera = cam;
+  Plotly.react(el, buildTraces(), lay, {responsive: true, displaylogo: false});
+}
+
+function radiusPlot() {
+  const radius = D.dots.true.map(norm);
+  const dist = D.dots.measured.map((m, i) => norm(sub(m, D.dots.true[i])));
+  const corr = D.dots.corrected.map((c, i) => norm(sub(c, D.dots.true[i])));
+  const lbl = D.dots.grid_index.map(g => g.join(', '));
+  const ax = t => ({title: {text: t}, color: css('--text-2'), gridcolor: css('--grid'), zerolinecolor: css('--axis'), linecolor: css('--axis')});
+  Plotly.react('plotRadius', [
+    {type: 'scattergl', mode: 'markers', x: radius, y: dist, name: 'Before correction', text: lbl,
+      hovertemplate: 'grid (%{text})<br>r = %{x:.0f} mm<br>distortion %{y:.2f} mm<extra>Before</extra>',
+      marker: {size: 8, color: css('--s-measured'), opacity: 0.75, line: {width: 1, color: css('--surface')}}},
+    {type: 'scattergl', mode: 'markers', x: radius, y: corr, name: 'After 5th order correction', text: lbl,
+      hovertemplate: 'grid (%{text})<br>r = %{x:.0f} mm<br>residual %{y:.2f} mm<extra>After</extra>',
+      marker: {size: 8, color: css('--s-corrected'), opacity: 0.75, line: {width: 1, color: css('--surface')}}},
+  ], {paper_bgcolor: css('--surface'), plot_bgcolor: css('--surface'), font: {family: 'system-ui, sans-serif', color: css('--text')},
+    margin: {l: 60, r: 20, t: 20, b: 50}, legend: {orientation: 'h', x: 0, y: 1.08, font: {color: css('--text-2')}},
+    hoverlabel: {bgcolor: css('--surface'), bordercolor: css('--border'), font: {color: css('--text')}},
+    xaxis: ax('Distance from isocentre (mm)'), yaxis: {...ax('Displacement (mm)'), rangemode: 'tozero'}},
+    {responsive: true, displaylogo: false});
+}
+
+function setupControls() {
+  const [nz, ny, nx] = dims;
+  const ext = (a, n) => [origin[a], origin[a] + (n - 1) * voxel[a]];
+  const init = {x: 0, y: 0, z: -8};
+  [['x', ext(0, nx), 0], ['y', ext(1, ny), 1], ['z', ext(2, nz), 2]].forEach(([a, [lo, hi], k]) => {
+    const s = document.getElementById('s' + a), o = document.getElementById('o' + a);
+    Object.assign(s, {min: lo, max: hi, step: voxel[k]});
+    s.value = init[a]; o.textContent = (+s.value).toFixed(1);
+    s.addEventListener('input', () => {
+      o.textContent = (+s.value).toFixed(1);
+      const t = sliceTrace(a, +s.value);
+      Plotly.restyle('plot3d', {x: [t.x], y: [t.y], z: [t.z], surfacecolor: [t.surfacecolor]}, traceIndex['slice_' + a]);
+    });
+  });
+  const sop = document.getElementById('sop'), oop = document.getElementById('oop');
+  const syncOp = () => { oop.textContent = (+sop.value).toFixed(2); };
+  syncOp();
+  sop.addEventListener('input', () => { syncOp(); Plotly.restyle('plot3d', {opacity: +sop.value}, ['x', 'y', 'z'].flatMap(a => traceIndex['slice_' + a])); });
+
+  const sexag = document.getElementById('sexag'), oexag = document.getElementById('oexag');
+  oexag.textContent = '×' + sexag.value;
+  sexag.addEventListener('input', () => {
+    exag = +sexag.value; oexag.textContent = '×' + sexag.value;
+    const v = vectorTrace(), l = latticeTrace();
+    Plotly.restyle('plot3d', {x: [v.x, l.x], y: [v.y, l.y], z: [v.z, l.z]}, [traceIndex.vectors[0], traceIndex.lattice[0]]);
+  });
+
+  const sliceVis = () => {
+    const on = document.querySelector('[data-layer="slices"]').checked;
+    ['x', 'y', 'z'].forEach(a => Plotly.restyle('plot3d', {visible: on && document.getElementById('show' + a.toUpperCase()).checked}, traceIndex['slice_' + a]));
+  };
+  document.querySelectorAll('[data-layer]').forEach(cb => cb.addEventListener('change', () => {
+    if (cb.dataset.layer === 'slices') return sliceVis();
+    Plotly.restyle('plot3d', {visible: cb.checked}, traceIndex[cb.dataset.layer]);
+  }));
+  ['showX', 'showY', 'showZ'].forEach(id => document.getElementById(id).addEventListener('change', sliceVis));
+  document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () =>
+    Plotly.relayout('plot3d', {'scene.camera': CAMERAS[b.dataset.view]})));
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { render3d(); radiusPlot(); });
+}
+
+(async () => {
+  try {
+    D = await (await fetch('data.json')).json();
+    tiles(D.stats); radiusTable(D.stats); coefTable(D.correction_polynomial); radiusPlot();
+    dims = D.volume.shape_zyx; origin = D.volume.origin_xyz; voxel = D.volume.voxel_xyz;
+    vol = await loadVolume(D.volume.file);
+    document.getElementById('plot3d').innerHTML = '';
+    setupControls();
+    render3d();
+  } catch (e) {
+    document.getElementById('plot3d').innerHTML = `<div class="loading">Could not load data: ${e.message}</div>`;
+    throw e;
+  }
+})();
+</script>
+</body>
+</html>
