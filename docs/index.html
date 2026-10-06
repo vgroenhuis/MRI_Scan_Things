@@ -25,6 +25,7 @@
   --s-marker: #b9b7ad;
   --s-stray: #4a3aa7;
   --s-room: #8f8d84;
+  --s-bed: #0066b3;
   --code-bg: #f3f2ee;
   --accent: #2a78d6;
 }
@@ -34,7 +35,7 @@
     --page: #0d0d0d; --surface: #1a1a19; --text: #ffffff; --text-2: #c3c2b7;
     --muted: #898781; --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
     --s-measured: #3987e5; --s-forward: #d95926; --s-corrected: #199e70;
-    --s-ideal: #a3a199; --s-seg: #d55181; --s-marker: #5d5c57; --s-stray: #9085e9; --s-room: #7a786f; --code-bg: #232321; --accent: #3987e5;
+    --s-ideal: #a3a199; --s-seg: #d55181; --s-marker: #5d5c57; --s-stray: #9085e9; --s-room: #7a786f; --s-bed: #2a7fd4; --code-bg: #232321; --accent: #3987e5;
   }
 }
 :root[data-theme="dark"] {
@@ -42,7 +43,7 @@
   --page: #0d0d0d; --surface: #1a1a19; --text: #ffffff; --text-2: #c3c2b7;
   --muted: #898781; --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
   --s-measured: #3987e5; --s-forward: #d95926; --s-corrected: #199e70;
-  --s-ideal: #a3a199; --s-seg: #d55181; --s-marker: #5d5c57; --s-stray: #9085e9; --s-room: #7a786f; --code-bg: #232321; --accent: #3987e5;
+  --s-ideal: #a3a199; --s-seg: #d55181; --s-marker: #5d5c57; --s-stray: #9085e9; --s-room: #7a786f; --s-bed: #2a7fd4; --code-bg: #232321; --accent: #3987e5;
 }
 * { box-sizing: border-box; }
 body {
@@ -178,7 +179,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
     <tr><td>z</td><td>+z towards <strong>S</strong>uperior (head)</td><td>z<sub>RAS</sub> = z (unchanged)</td><td>z = −85.98 + 1.055 · slice</td></tr>
   </table></div>
   <p style="margin-top:12px">Converting a point between LPS and RAS is just flipping the sign of x and y. The origin (0, 0, 0) is the same in both. Here it is the centre of the field of view, presumably the magnet isocentre.</p>
-  <p><strong>Relation to the room.</strong> The anatomical labels refer to the patient position entered at the console, here <strong>Feet First Supine (FFS)</strong>, also for a phantom. For a supine patient posterior is down, so <strong>+y points towards the floor</strong>. At 0° tilt the main field B<sub>0</sub> of the G-scan is vertical, i.e. along y. With feet first, +z (superior) points out of the magnet towards the free end of the bed. Had the scan been registered as Head First Supine, x and z would point the other way in the room. Switch on <em>Scanner, bed &amp; floor</em> in the viewer to see this.</p>
+  <p><strong>Relation to the room.</strong> The anatomical labels refer to the patient position entered at the console, here <strong>Feet First Supine (FFS)</strong>, also for a phantom. For a supine patient posterior is down, so <strong>+y points towards the floor</strong>. At 0° tilt the main field B<sub>0</sub> of the G-scan is vertical, i.e. along y. With feet first, +z (superior) points towards the side of the magnet from which the patient entered. Had the scan been registered as Head First Supine, x and z would point the other way in the room. Switch on <em>Scanner, bed &amp; floor</em> in the viewer to see this.</p>
   <p><strong>Converting the polynomial.</strong> The coefficients cannot simply be relabelled: in RAS the mapping becomes P<sub>RAS</sub>(r) = D · P<sub>LPS</sub>(D · r) with D = diag(−1, −1, 1), which changes the sign of some coefficients. Both versions are provided in <a href="polynomials.json">polynomials.json</a> (keys <code>lps</code> and <code>ras</code>).</p>
 
   <h2>Method</h2>
@@ -450,10 +451,10 @@ function latticeTrace() {
 // ------------------------------------------------- scanner sketch (room) --
 // Approximate geometry of the Esaote G-scan Brio at 0° tilt, in LPS mm (+y = down for a
 // supine patient). C-shaped permanent magnet with poles above and below the patient
-// (vertical B0) and a ~33 cm gap; feet first, so the bed extends towards +z.
+// (vertical B0) and a ~33 cm gap; the patient bed runs centred through the gap.
 // Dimensions are a sketch, not taken from a technical drawing.
 const ROOM = {gap: 330, poleDepth: 330, magnetX: [-650, 330], magnetZ: [-330, 330], yokeX: [-650, -430],
-  floorY: 1000, bedHalfWidth: 240, bedThickness: 35, bedZ: [-500, 2100], bedBaseZ: [1450, 1850]};
+  floorY: 1000, bedHalfWidth: 240, bedThickness: 35, bedZ: [-1000, 1000]};
 
 function box([x0, x1], [y0, y1], [z0, z1], name, color, opacity) {
   return {type: 'mesh3d', name, hoverinfo: 'name', color, opacity, flatshading: true,
@@ -480,8 +481,7 @@ function roomTraces() {
     box(R.magnetX, [g, bot], R.magnetZ, 'Magnet: lower pole', c, 0.35),
     box(R.yokeX, [-g, g], R.magnetZ, 'Magnet: yoke (C)', c, 0.35),
     box(R.magnetX, [bot, R.floorY], [R.magnetZ[0] + 40, R.magnetZ[1] - 40], 'Magnet base', c, 0.25),
-    box([-R.bedHalfWidth, R.bedHalfWidth], [bedTop, bedBottom], R.bedZ, 'Patient bed', css('--s-forward'), 0.3),
-    box([-R.bedHalfWidth + 60, R.bedHalfWidth - 60], [bedBottom, R.floorY], R.bedBaseZ, 'Bed support', c, 0.25),
+    box([-R.bedHalfWidth, R.bedHalfWidth], [bedTop, bedBottom], R.bedZ, 'Patient bed', css('--s-bed'), 0.85),
     box([-1500, 1500], [R.floorY, R.floorY + 5], [-1500, 2600], 'Floor', c, 0.15),
     wire(...phantom, 'Calibration cube (approx.)', css('--text-2')),
     {type: 'scatter3d', mode: 'lines+text', name: 'B0 (vertical)', hoverinfo: 'name', x: [250, 250], y: [-g + 20, g - 20], z: [0, 0],
