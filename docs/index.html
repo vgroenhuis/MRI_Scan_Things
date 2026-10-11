@@ -105,11 +105,14 @@ pre.code { background: var(--code-bg); margin-top: 6px; line-height: 1.45; }
 .calc output { font-variant-numeric: tabular-nums; font-size: 14px; color: var(--text); }
 .calc .res { flex-basis: 100%; display: grid; gap: 2px; font-size: 14px; color: var(--text-2); }
 table.axes td, table.axes th { text-align: left; }
+.home-link { display: inline-block; margin-bottom: 14px; font-size: 14px; text-decoration: none; }
+.home-link:hover { text-decoration: underline; }
 footer { margin-top: 48px; font-size: 13px; color: var(--muted); }
 </style>
 </head>
 <body>
 <main>
+  <a class="home-link" href="https://vgroenhuis.github.io/">&larr; Vincent Groenhuis</a>
   <h1>MRI geometric distortion: calibration cube</h1>
   <p class="sub">Esaote G-scan Brio (0.25 T), 3D HYCE sequence, 256 × 256 × 164 voxels of 1.055 mm. Scanned at the University of Twente, May 2022.
   The phantom contains small markers on a regular 3D grid with <strong>20 mm</strong> spacing. Comparing where the scanner shows them with where they really are gives the geometric distortion, which is modelled by a 5th order polynomial.</p>
